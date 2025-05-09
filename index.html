@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#3498db">
+  <title>Zeiterfassung</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="theme-toggle" id="theme-toggle">🌓</button>
+  <button class="install-btn" id="install-btn">📲</button>
+
+  <div class="section">
+    <h2>Zeiterfassung</h2>
+
+    <div class="settings">
+      <label for="work-hours">Tägliche Sollstunden:</label>
+      <input type="number" id="work-hours" min="1" max="24" value="8">
+
+      <label for="vacation-days-year">Jährliche Urlaubstage:</label>
+      <input type="number" id="vacation-days-year" min="1" max="365" value="24">
+
+      <label for="carryover-days">Resturlaub Vorjahr:</label>
+      <input type="number" id="carryover-days" min="0" value="0">
+    </div>
+
+    <div>
+      <label for="date">Datum:</label>
+      <input type="date" id="date">
+    </div>
+    <div id="time-fields">
+      <label for="start-time">Kommen:</label>
+      <input type="time" id="start-time" placeholder="z. B. 08:00" pattern="[0-9]{2}:[0-9]{2}">
+    </div>
+    <div id="time-fields">
+      <label for="end-time">Gehen:</label>
+      <input type="time" id="end-time" placeholder="z. B. 16:30" pattern="[0-9]{2}:[0-9]{2}">
+    </div>
+    <div id="time-fields">
+      <label for="break">Pause (Minuten):</label>
+      <input type="number" id="break" value="30" placeholder="z. B. 30" min="0" max="240">
+    </div>
+    <div>
+      <label for="type">Art:</label>
+      <select id="type">
+        <option value="Arbeit">Arbeit</option>
+        <option value="Urlaub">Urlaub</option>
+        <option value="Krank">Krank</option>
+        <option value="Feiertag">Feiertag</option>
+        <option value="Frei Überstunden">Frei Überstunden</option>
+      </select>
+    </div>
+    <div id="overtime-field" style="display: none;">
+      <label for="overtime-amount">Überstunden (HH:MM):</label>
+      <input type="text" id="overtime-amount" placeholder="z.B. 8:30">
+    </div>
+    <button id="add-entry-btn">Eintrag hinzufügen</button>
+
+    <div id="time-range" style="display: none;">
+      <label for="end-date">Bis Datum:</label>
+      <input type="date" id="end-date">
+      <button id="add-time-range-btn">Zeitraum hinzufügen</button>
+    </div>
+
+    <div>
+      <label for="month">Monat anzeigen:</label>
+      <input type="month" id="month">
+    </div>
+
+    <h3 id="report-title">Monatsreport</h3>
+    <div style="overflow-x: auto;">
+      <table id="time-entries">
+        <thead>
+          <tr>
+            <th>Datum</th>
+            <th>Kommen</th>
+            <th>Gehen</th>
+            <th>Pause</th>
+            <th>Art</th>
+            <th>Stunden</th>
+            <th>Soll</th>
+            <th>Differenz</th>
+            <th>Aktion</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="stats">
+      <div class="stat-box">
+        <h4>Überstunden</h4>
+        <p id="overtime">0:00</p>
+      </div>
+      <div class="stat-box">
+        <h4>Urlaubstage</h4>
+        <p id="vacation-days">0 Tage (verfügbar: 24)</p>
+      </div>
+      <div class="stat-box">
+        <h4>Krankheitstage</h4>
+        <p id="sick-days">0 Tage</p>
+      </div>
+
+    </div>
+
+    <button id="export-csv-btn" class="secondary">CSV exportieren</button>
+    <button id="export-pdf-btn" class="secondary">PDF exportieren</button>
+    <button id="export-backup-btn" class="secondary">Backup speichern</button>
+    <button id="import-backup-btn">Backup laden</button>
+    <input type="file" id="import-file" style="display:none">
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
