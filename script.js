@@ -41,6 +41,11 @@ let vacationSettings = JSON.parse(localStorage.getItem('vacationSettings')) || {
 
 // Initialisierung
 document.addEventListener('DOMContentLoaded', async () => {
+  // Event-Listener für Backup-Import
+  document.getElementById('import-backup-btn').addEventListener('click', () => {
+    document.getElementById('import-file').click();
+  });
+  document.getElementById('import-file').addEventListener('change', handleImport);
   await initDB();
   const now = new Date();
   document.getElementById('date').valueAsDate = now;
@@ -134,6 +139,33 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Event Listener sind bereits in DOMContentLoaded initialisiert
 
+// Automatisches Backup
+function autoBackup() {
+  const data = {
+    entries: timeEntries,
+    settings: {
+      workHours: localStorage.getItem('workHours') || 8,
+      vacationDays: localStorage.getItem('vacationDays') || 24,
+      carryoverDays: localStorage.getItem('carryoverDays') || 0,
+      totalOvertimeMinutes: totalOvertimeMinutes
+    },
+    exported: new Date().toISOString()
+  };
+  
+  // Speichere Backup im localStorage
+  const backupKey = `backup_${new Date().getTime()}`;
+  localStorage.setItem(backupKey, JSON.stringify(data));
+  
+  // Behalte nur die letzten 2 Backups
+  const backupKeys = Object.keys(localStorage)
+    .filter(key => key.startsWith('backup_'))
+    .sort((a, b) => b.split('_')[1] - a.split('_')[1]);
+  
+  if (backupKeys.length > 2) {
+    localStorage.removeItem(backupKeys[2]);
+  }
+}
+
 // IndexedDB Initialisierung
 function initDB() {
   return new Promise((resolve, reject) => {
@@ -148,11 +180,42 @@ function initDB() {
 
     request.onsuccess = (event) => {
       db = event.target.result;
+      // Lade vorhandene Backups
+      const backupKeys = Object.keys(localStorage)
+        .filter(key => key.startsWith('backup_'))
+        .sort((a, b) => b.split('_')[1] - a.split('_')[1]);
+      
+      if (backupKeys.length > 0) {
+        const latestBackup = JSON.parse(localStorage.getItem(backupKeys[0]));
+        if (latestBackup.entries) {
+          timeEntries = latestBackup.entries;
+          localStorage.setItem('workHours', latestBackup.settings.workHours);
+          localStorage.setItem('vacationDays', latestBackup.settings.vacationDays);
+          localStorage.setItem('carryoverDays', latestBackup.settings.carryoverDays);
+          totalOvertimeMinutes = latestBackup.settings.totalOvertimeMinutes;
+        }
+      }
       resolve();
     };
 
     request.onerror = (event) => {
       console.error('IndexedDB error:', event.target.error);
+      // Versuche Backup zu laden
+      const backupKeys = Object.keys(localStorage)
+        .filter(key => key.startsWith('backup_'))
+        .sort((a, b) => b.split('_')[1] - a.split('_')[1]);
+      
+      if (backupKeys.length > 0) {
+        const latestBackup = JSON.parse(localStorage.getItem(backupKeys[0]));
+        if (latestBackup.entries) {
+          timeEntries = latestBackup.entries;
+          localStorage.setItem('workHours', latestBackup.settings.workHours);
+          localStorage.setItem('vacationDays', latestBackup.settings.vacationDays);
+          localStorage.setItem('carryoverDays', latestBackup.settings.carryoverDays);
+          totalOvertimeMinutes = latestBackup.settings.totalOvertimeMinutes;
+        }
+      }
+      resolve();
       // Fallback zu localStorage
       timeEntries = JSON.parse(localStorage.getItem('timeEntries') || '[]');
       totalOvertimeMinutes = parseInt(localStorage.getItem('totalOvertimeMinutes') || 0);
@@ -176,7 +239,10 @@ function saveEntry(entry) {
     const store = transaction.objectStore(STORE_NAME);
     const request = store.add(entry);
 
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => {
+  autoBackup();
+  resolve();
+};
     request.onerror = (event) => {
       console.error('Error saving entry:', event.target.error);
       reject(event.target.error);
@@ -776,9 +842,10 @@ function exportBackup() {
 }
 
 // Backup importieren
-function handleImport(e) {
+async function handleImport(e) {
   const file = e.target.files[0];
   if (!file) return;
+  
   const reader = new FileReader();
   reader.onload = async function (event) {
     try {
@@ -799,19 +866,16 @@ function handleImport(e) {
             }
 
             // Einstellungen übernehmen
-            if (data.settings) {
-              localStorage.setItem('workHours', data.settings.workHours);
-              localStorage.setItem('vacationDays', data.settings.vacationDays);
-              localStorage.setItem('carryoverDays', data.settings.carryoverDays);
-              localStorage.setItem('totalOvertimeMinutes', data.settings.totalOvertimeMinutes);
-              document.getElementById('work-hours').value = data.settings.workHours;
-              document.getElementById('vacation-days-year').value = data.settings.vacationDays;
-              document.getElementById('carryover-days').value = data.settings.carryoverDays;
-              totalOvertimeMinutes = data.settings.totalOvertimeMinutes;
-            }
+            localStorage.setItem('workHours', data.settings.workHours);
+            localStorage.setItem('vacationDays', data.settings.vacationDays);
+            localStorage.setItem('carryoverDays', data.settings.carryoverDays);
+            totalOvertimeMinutes = data.settings.totalOvertimeMinutes;
 
-            loadEntries();
-            alert('Import erfolgreich.');
+            // Neue Einträge laden
+            await loadEntries();
+            renderEntries();
+
+            alert('Backup erfolgreich importiert!');
           };
         } else {
           // Fallback zu localStorage
