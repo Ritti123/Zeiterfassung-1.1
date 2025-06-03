@@ -697,15 +697,19 @@ function exportCSV() {
   // Gesamtzeiten berechnen
   let totalSoll = 0;
   let totalIst = 0;
-  let totalOvertimeMinutes = 0;
   entries.forEach(e => {
+    // Sollstunden berechnen
+    const sollHours = parseFloat(localStorage.getItem('workHours') || 8);
+    totalSoll += e.type === 'Überstunden' ? 0 : sollHours;
+    
+    // Iststunden berechnen
     if (e.type === 'Arbeit') {
-      const sollHours = e.sollHours ? e.sollHours : parseFloat(localStorage.getItem('workHours') || 8);
-      totalSoll += sollHours;
       if (e.hours) {
         const [hours, minutes] = e.hours.split(':').map(Number);
         totalIst += hours + minutes/60;
       }
+    } else if (e.type !== 'Überstunden') {
+      totalIst += sollHours;
     }
   });
 
@@ -714,11 +718,22 @@ function exportCSV() {
 
   // Einträge hinzufügen
   entries.forEach(e => {
-    const sollHours = e.type === 'Arbeit' ? (e.sollHours ? e.sollHours : parseFloat(localStorage.getItem('workHours') || 8)) : '';
+    // Sollstunden
+    const sollHours = parseFloat(localStorage.getItem('workHours') || 8);
+    const sollTime = `${Math.floor(sollHours)}:${String(Math.round((sollHours % 1) * 60)).padStart(2, '0')}`;
+    
+    // Iststunden
+    let istTime = '0:00';
+    if (e.type === 'Arbeit' && e.hours) {
+      istTime = e.hours;
+    } else if (e.type !== 'Überstunden') {
+      istTime = sollTime;
+    }
+    
+    // Differenz berechnen
     let diff = '';
-
-    if (e.type === 'Arbeit') {
-      const [h, m] = (e.hours || '0:00').split(":").map(Number);
+    if (e.type === 'Arbeit' && e.hours) {
+      const [h, m] = e.hours.split(":").map(Number);
       const istMin = h * 60 + m;
       const sollMin = sollHours * 60;
       const diffMin = istMin - sollMin;
@@ -726,7 +741,7 @@ function exportCSV() {
       diff = `${sign}${Math.floor(Math.abs(diffMin) / 60)}:${String(Math.abs(diffMin) % 60).padStart(2, '0')}`;
     }
 
-    csv += `${formatDate(e.date)};${e.type === 'Arbeit' ? e.start || '' : ''};${e.type === 'Arbeit' ? e.end || '' : ''};${e.type === 'Arbeit' ? e.pause : ''};${e.type};${e.hours || '0:00'};${sollHours};${diff}\n`;
+    csv += `${formatDate(e.date)};${e.type === 'Arbeit' ? e.start || '' : ''};${e.type === 'Arbeit' ? e.end || '' : ''};${e.type === 'Arbeit' ? e.pause : ''};${e.type};${istTime};${sollTime};${diff}\n`;
   });
 
   // Gesamtzeiten unter den Spalten hinzufügen
@@ -776,27 +791,38 @@ function exportPDF() {
     const headers = ["Datum", "Kommen", "Gehen", "Pause", "Art", "Stunden", "Sollstunden", "Differenz"];
     let data = [];
 
-    // Gesamtzeiten aus der Tabelle berechnen
+    // Gesamtzeiten berechnen
     let totalSoll = 0;
     let totalIst = 0;
     entries.forEach(e => {
+      const sollHours = parseFloat(localStorage.getItem('workHours') || 8);
+      totalSoll += e.type === 'Überstunden' ? 0 : sollHours;
+      
       if (e.type === 'Arbeit') {
-        const sollHours = e.sollHours ? e.sollHours : parseFloat(localStorage.getItem('workHours') || 8);
-        totalSoll += sollHours;
         if (e.hours) {
           const [hours, minutes] = e.hours.split(':').map(Number);
           totalIst += hours + minutes/60;
         }
+      } else if (e.type !== 'Überstunden') {
+        totalIst += sollHours;
       }
     });
 
     // Tabellendaten
     entries.forEach(e => {
-      const sollHours = e.type === 'Arbeit' ? (e.sollHours ? e.sollHours : parseFloat(localStorage.getItem('workHours') || 8)) : '';
+      const sollHours = parseFloat(localStorage.getItem('workHours') || 8);
+      const sollTime = `${Math.floor(sollHours)}:${String(Math.round((sollHours % 1) * 60)).padStart(2, '0')}`;
+      
+      let istTime = '0:00';
+      if (e.type === 'Arbeit' && e.hours) {
+        istTime = e.hours;
+      } else if (e.type !== 'Überstunden') {
+        istTime = sollTime;
+      }
+      
       let diff = '';
-
-      if (e.type === 'Arbeit') {
-        const [h, m] = (e.hours || '0:00').split(":").map(Number);
+      if (e.type === 'Arbeit' && e.hours) {
+        const [h, m] = e.hours.split(":").map(Number);
         const istMin = h * 60 + m;
         const sollMin = sollHours * 60;
         const diffMin = istMin - sollMin;
@@ -810,8 +836,8 @@ function exportPDF() {
         e.type === 'Arbeit' ? e.end || '-' : '-',
         e.type === 'Arbeit' ? e.pause || '0' : '-',
         e.type,
-        e.hours || '0:00',
-        sollHours === '' ? '' : `${Math.floor(sollHours)}:${String(Math.round((sollHours % 1) * 60)).padStart(2, '0')}`,
+        istTime,
+        sollTime,
         diff
       ]);
     });
@@ -826,14 +852,7 @@ function exportPDF() {
       headStyles: { fillColor: [192, 192, 192] }
     });
 
-    // Gesamtzeiten als einfache Zeile hinzufügen
-    const formatTime = (minutes) => {
-      const hours = Math.floor(minutes / 60);
-      const mins = minutes % 60;
-      return `${hours}:${mins.toString().padStart(2, '0')}`;
-    };
-
-    // Gesamtzeiten unter den Spalten hinzufügen (gleiche Schriftgröße wie Tabelle)
+    // Gesamtzeiten unter den Spalten hinzufügen
     doc.setFontSize(8);
     doc.autoTable({
       head: [["", "", "", "", "", `${Math.floor(totalSoll)}:${String(Math.round((totalSoll % 1) * 60)).padStart(2, '0')}`, `${Math.floor(totalIst)}:${String(Math.round((totalIst % 1) * 60)).padStart(2, '0')}`, ""]],
@@ -842,37 +861,28 @@ function exportPDF() {
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [255, 255, 255] }
     });
-    doc.setFontSize(16); // danach wieder zurücksetzen für Überschriften
 
     // Überstunden berechnen
-    let overtime = 0;
-    entries.forEach(e => {
-      if (e.type === 'Arbeit' && e.hours) {
-        const [h, m] = e.hours.split(":").map(Number);
-        const totalMinutes = h * 60 + m;
-        const sollMinutes = parseFloat(e.sollHours || localStorage.getItem('workHours') || 8) * 60;
-        if (totalMinutes > sollMinutes) {
-          overtime += totalMinutes - sollMinutes;
-        }
-      }
-    });
+    const overtimeMinutes = (totalIst - totalSoll) * 60;
+    const overtime = `${Math.floor(Math.abs(overtimeMinutes) / 60)}:${String(Math.abs(overtimeMinutes) % 60).padStart(2, '0')}`;
 
-    const [oh, om] = [Math.floor(overtime / 60), overtime % 60];
-    const sign = overtime >= 0 ? '+' : '-';
-    const vacationTotal = parseFloat(localStorage.getItem('vacationTotal') || 30);
-    const vacationTaken = timeEntries.filter(e => e.type === 'Urlaub').length;
-    const sickDays = timeEntries.filter(e => e.type === 'Krank').length;
-    const carryoverDays = vacationTotal - vacationTaken;
+    // Zusatzinformationen hinzufügen
+    const vacationDays = parseInt(localStorage.getItem('vacationDays') || 24);
+    const carryoverDays = parseInt(localStorage.getItem('carryoverDays') || 0);
+    const vacationTotal = vacationDays + carryoverDays;
+    const vacationTaken = entries.filter(e => e.type === 'Urlaub').length;
+    const sickDays = entries.filter(e => e.type === 'Krank').length;
 
-    doc.text(`Überstunden: ${sign}${oh}:${String(om).padStart(2, '0')}`, 14, doc.lastAutoTable.finalY + 20);
-    doc.text(`Urlaub: ${vacationTaken} Tage (verfügbar: ${vacationTotal}, Resturlaub: ${carryoverDays})`, 14, doc.lastAutoTable.finalY + 30);
-    doc.text(`Krankheitstage: ${sickDays}`, 14, doc.lastAutoTable.finalY + 40);
+    doc.setFontSize(8);
+    doc.text(`Überstunden: ${overtime}`, 10, doc.lastAutoTable.finalY + 10);
+    doc.text(`Urlaubstage: ${vacationTaken} Tage (verfügbar: ${vacationTotal}, Resturlaub: ${carryoverDays})`, 10, doc.lastAutoTable.finalY + 15);
+    doc.text(`Krankheitstage: ${sickDays}`, 10, doc.lastAutoTable.finalY + 20);
 
     // PDF speichern
     doc.save(`Monatsreport_${monthNames[parseInt(month)-1]}_${year}.pdf`);
   } catch (error) {
-    console.error('PDF-Export fehlgeschlagen:', error);
-    alert('Fehler beim PDF-Export: ' + error.message);
+    console.error('Fehler beim PDF-Export:', error);
+    alert('Fehler beim Erstellen des PDF-Reports');
   }
 }
 // Backup exportieren
