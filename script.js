@@ -318,21 +318,6 @@ function renderEntries() {
   vacationDaysInput.value = currentSettings.vacationDays;
   carryoverDaysInput.value = currentSettings.carryoverDays;
 
-  // Gesamtüberstunden berechnen
-  totalOvertimeMinutes = 0;
-  timeEntries.forEach(entry => {
-    if (entry.type === 'Arbeit') {
-      const [h, m] = (entry.hours || '0:00').split(":").map(Number);
-      const istMin = h * 60 + m;
-      const sollMin = entry.sollHours ? entry.sollHours * 60 : parseFloat(localStorage.getItem('workHours') || 8) * 60;
-      totalOvertimeMinutes += istMin - sollMin;
-    } else if (entry.type === 'Frei Überstunden') {
-      const [h, m] = (entry.hours || '0:00').split(":").map(Number);
-      const istMin = h * 60 + m;
-      totalOvertimeMinutes -= istMin;
-    }
-  });
-
   // Zähle Urlaubstage für das aktuelle Jahr
   const currentYearEntries = timeEntries.filter(e => e.date && e.date.startsWith(`${year}-`));
   vacationDaysTaken = currentYearEntries.filter(e => e.type === 'Urlaub').length;
@@ -340,7 +325,7 @@ function renderEntries() {
   holidayDaysTaken = currentYearEntries.filter(e => e.type === 'Feiertag').length;
 
   // Aktualisiere die Statistik
-  updateStats(totalOvertimeMinutes, vacationDaysTaken, availableVacationDays, sickDaysTaken);
+  updateStats(totalOvertimeMinutes, vacationDaysTaken, availableVacationDays, sickDaysTaken, holidayDaysTaken);
 
   entries.forEach(entry => {
     const row = tbody.insertRow();
@@ -349,7 +334,10 @@ function renderEntries() {
     row.insertCell(2).textContent = entry.type === 'Arbeit' ? entry.end || '-' : '-';
     row.insertCell(3).textContent = entry.type === 'Arbeit' ? entry.pause || 0 : '-';
     row.insertCell(4).textContent = entry.type === 'Frei Überstunden' ? 'Frei Überstd.' : entry.type;
-    row.insertCell(5).textContent = entry.hours || '0:00';
+    // Iststunden für Urlaub/Krank/Feiertag setzen
+    const workHours = parseFloat(localStorage.getItem('workHours') || 8);
+    const istHours = entry.type === 'Arbeit' ? entry.hours : entry.type !== 'Überstunden' ? `${Math.floor(workHours)}:${String(Math.round((workHours % 1) * 60)).padStart(2, '0')}` : '0:00';
+    row.insertCell(5).textContent = istHours;
 
     let istMin = 0;
     if (entry.type === 'Arbeit') {
@@ -357,16 +345,21 @@ function renderEntries() {
       istMin = h * 60 + m;
       const sollMin = entry.sollHours ? entry.sollHours * 60 : parseFloat(localStorage.getItem('workHours') || 8) * 60;
       monthlyOvertimeMinutes += istMin - sollMin;
-    } else if (entry.type === 'Frei Überstunden') {
+    } else if (entry.type === 'Überstunden') {
+      const [h, m] = (entry.hours || '0:00').split(":").map(Number);
+      istMin = h * 60 + m;
+      monthlyOvertimeMinutes += istMin;
+    } else if (entry.type === 'Überstundenfrei') {
       const [h, m] = (entry.hours || '0:00').split(":").map(Number);
       istMin = h * 60 + m;
       monthlyOvertimeMinutes -= istMin;
+    } else {
+      istMin = workHours * 60;
+      monthlyOvertimeMinutes += istMin - (workHours * 60);
     }
 
-    const sollHours = entry.sollHours ? entry.sollHours : parseFloat(localStorage.getItem('workHours') || 8);
-    row.insertCell(6).textContent = entry.type === 'Arbeit'
-      ? `${Math.floor(sollHours)}:${String(Math.round((sollHours % 1) * 60)).padStart(2, '0')}`
-      : '-';
+    const sollHours = parseFloat(localStorage.getItem('workHours') || 8);
+    row.insertCell(6).textContent = `${Math.floor(sollHours)}:${String(Math.round((sollHours % 1) * 60)).padStart(2, '0')}`;
 
     let diff = '';
     if (entry.type === 'Arbeit') {
@@ -376,6 +369,8 @@ function renderEntries() {
       const diffMin = istMin - sollMin;
       const sign = diffMin < 0 ? '-' : '';
       diff = `${sign}${Math.floor(Math.abs(diffMin) / 60)}:${String(Math.abs(diffMin) % 60).padStart(2, '0')}`;
+    } else if (entry.type !== 'Überstunden') {
+      diff = '0:00';
     }
 
     row.insertCell(7).textContent = diff;
@@ -388,14 +383,14 @@ function renderEntries() {
   });
 
   // Gesamtüberstunden berechnen
-  totalOvertimeMinutes = 0;
+  totalOvertimeMinutes = monthlyOvertimeMinutes;
   timeEntries.forEach(entry => {
     if (entry.type === 'Arbeit') {
       const [h, m] = (entry.hours || '0:00').split(":").map(Number);
       const istMin = h * 60 + m;
       const sollMin = entry.sollHours ? entry.sollHours * 60 : parseFloat(localStorage.getItem('workHours') || 8) * 60;
       totalOvertimeMinutes += istMin - sollMin;
-    } else if (entry.type === 'Frei Überstunden') {
+    } else if (entry.type === 'Überstundenfrei') {
       const [h, m] = (entry.hours || '0:00').split(":").map(Number);
       const istMin = h * 60 + m;
       totalOvertimeMinutes -= istMin;
@@ -723,12 +718,8 @@ function exportCSV() {
     const sollTime = `${Math.floor(sollHours)}:${String(Math.round((sollHours % 1) * 60)).padStart(2, '0')}`;
     
     // Iststunden
-    let istTime = '0:00';
-    if (e.type === 'Arbeit' && e.hours) {
-      istTime = e.hours;
-    } else if (e.type !== 'Überstunden') {
-      istTime = sollTime;
-    }
+    const workHours = parseFloat(localStorage.getItem('workHours') || 8);
+    const istHours = e.type === 'Arbeit' ? e.hours : e.type !== 'Überstunden' ? `${Math.floor(workHours)}:${String(Math.round((workHours % 1) * 60)).padStart(2, '0')}` : '0:00';
     
     // Differenz berechnen
     let diff = '';
@@ -741,7 +732,7 @@ function exportCSV() {
       diff = `${sign}${Math.floor(Math.abs(diffMin) / 60)}:${String(Math.abs(diffMin) % 60).padStart(2, '0')}`;
     }
 
-    csv += `${formatDate(e.date)};${e.type === 'Arbeit' ? e.start || '' : ''};${e.type === 'Arbeit' ? e.end || '' : ''};${e.type === 'Arbeit' ? e.pause : ''};${e.type};${istTime};${sollTime};${diff}\n`;
+    csv += `${formatDate(e.date)};${e.type === 'Arbeit' ? e.start || '' : ''};${e.type === 'Arbeit' ? e.end || '' : ''};${e.type === 'Arbeit' ? e.pause : ''};${e.type};${istHours};${sollTime};${diff}\n`;
   });
 
   // Gesamtzeiten unter den Spalten hinzufügen
