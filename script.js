@@ -727,6 +727,7 @@ function exportCSV() {
 
   // Gesamtzeiten unter den Spalten hinzufügen
   csv += `\n;_;_;_;_;_;${Math.floor(totalSoll)}:${String(Math.round((totalSoll % 1) * 60)).padStart(2, '0')};${Math.floor(totalIst)}:${String(Math.round((totalIst % 1) * 60)).padStart(2, '0')};_`;
+  csv += `\nÜberstunden:;${overtime}\nUrlaub:;${vacationTaken} Tage (verfügbar: ${vacationTotal}, Resturlaub: ${carryoverDays})\nKrankheitstage:;${sickDays}`;
 
   const oh = Math.floor(Math.abs(totalOvertimeMinutes) / 60);
   const om = Math.abs(totalOvertimeMinutes) % 60;
