@@ -770,6 +770,19 @@ function exportPDF() {
     const headers = ["Datum", "Kommen", "Gehen", "Pause", "Art", "Stunden", "Sollstunden", "Differenz"];
     let data = [];
 
+    // Gesamtzeiten berechnen
+    let totalSoll = 0;
+    let totalIst = 0;
+    entries.forEach(e => {
+      if (e.type === 'Arbeit') {
+        totalSoll += parseFloat(e.sollHours || localStorage.getItem('workHours') || 8);
+        if (e.hours) {
+          const [hours, minutes] = e.hours.split(':').map(Number);
+          totalIst += hours + minutes/60;
+        }
+      }
+    });
+
     // Tabellendaten
     entries.forEach(e => {
       const sollHours = e.type === 'Arbeit' ? (e.sollHours ? e.sollHours : parseFloat(localStorage.getItem('workHours') || 8)) : '';
@@ -796,48 +809,59 @@ function exportPDF() {
       ]);
     });
 
-    // Tabelle einfügen
+    // Tabelle erstellen
     doc.autoTable({
       head: [headers],
       body: data,
-      startY: 25,
-      margin: { horizontal: 10 },
-      styles: {
-        fontSize: 8,
-        cellPadding: 2,
-        overflow: 'linebreak'
-      },
-      headStyles: {
-        fillColor: [52, 152, 219],
-        textColor: 255
+      startY: 30,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [192, 192, 192] }
+    });
+
+    // Gesamtzeiten anzeigen
+    const formatTime = (minutes) => {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return `${hours}:${mins.toString().padStart(2, '0')}`;
+    };
+
+    doc.text('Gesamtzeiten:', 14, doc.lastAutoTable.finalY + 10);
+    doc.text(`Gesamt Sollzeit: ${formatTime(totalSoll * 60)}`, 14, doc.lastAutoTable.finalY + 20);
+    doc.text(`Gesamt Istzeit: ${formatTime(totalIst * 60)}`, 14, doc.lastAutoTable.finalY + 30);
+    doc.text(`Differenz: ${formatTime((totalIst - totalSoll) * 60)}`, 14, doc.lastAutoTable.finalY + 40);
+
+    // Überstunden berechnen
+    let overtime = 0;
+    entries.forEach(e => {
+      if (e.type === 'Arbeit' && e.hours) {
+        const [h, m] = e.hours.split(":").map(Number);
+        const totalMinutes = h * 60 + m;
+        const sollMinutes = parseFloat(e.sollHours || localStorage.getItem('workHours') || 8) * 60;
+        if (totalMinutes > sollMinutes) {
+          overtime += totalMinutes - sollMinutes;
+        }
       }
     });
 
-    // Statistiken hinzufügen
-    const finalY = doc.lastAutoTable.finalY + 15;
-    doc.setFontSize(12);
-    const oh = Math.floor(Math.abs(totalOvertimeMinutes) / 60);
-    const om = Math.abs(totalOvertimeMinutes) % 60;
-    const sign = totalOvertimeMinutes < 0 ? "-" : "";
-    const vacationDays = parseInt(localStorage.getItem('vacationDays') || 24);
-    const carryoverDays = parseInt(localStorage.getItem('carryoverDays') || 0);
-    const vacationTotal = vacationDays + carryoverDays;
+    const [oh, om] = [Math.floor(overtime / 60), overtime % 60];
+    const sign = overtime >= 0 ? '+' : '-';
+    const vacationTotal = parseFloat(localStorage.getItem('vacationTotal') || 30);
     const vacationTaken = timeEntries.filter(e => e.type === 'Urlaub').length;
     const sickDays = timeEntries.filter(e => e.type === 'Krank').length;
+    const carryoverDays = vacationTotal - vacationTaken;
 
-    doc.text(`Überstunden: ${sign}${oh}:${String(om).padStart(2, '0')}`, 14, finalY);
-    doc.text(`Urlaub: ${vacationTaken} Tage (verfügbar: ${vacationTotal}, Resturlaub: ${carryoverDays})`, 14, finalY + 10);
-    doc.text(`Krankheitstage: ${sickDays}`, 14, finalY + 20);
+    doc.text(`Überstunden: ${sign}${oh}:${String(om).padStart(2, '0')}`, 14, doc.lastAutoTable.finalY + 50);
+    doc.text(`Urlaub: ${vacationTaken} Tage (verfügbar: ${vacationTotal}, Resturlaub: ${carryoverDays})`, 14, doc.lastAutoTable.finalY + 60);
+    doc.text(`Krankheitstage: ${sickDays}`, 14, doc.lastAutoTable.finalY + 70);
 
     // PDF speichern
     doc.save(`Monatsreport_${monthNames[parseInt(month)-1]}_${year}.pdf`);
-
   } catch (error) {
     console.error('PDF-Export fehlgeschlagen:', error);
     alert('Fehler beim PDF-Export: ' + error.message);
   }
 }
-
 // Backup exportieren
 function exportBackup() {
   const data = {
