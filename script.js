@@ -725,8 +725,8 @@ function exportCSV() {
   csv += `${formatDate(e.date)};${e.type === 'Arbeit' ? e.start || '' : ''};${e.type === 'Arbeit' ? e.end || '' : ''};${e.type === 'Arbeit' ? e.pause : ''};${e.type};${e.hours || '0:00'};${e.type === 'Arbeit' ? sollHours : ''};${diff}\n`;
   });
 
-  // Gesamtzeiten als einfache Zeile hinzufügen
-  csv += `\nGesamt: ${Math.floor(totalSoll)}:${String(Math.round((totalSoll % 1) * 60)).padStart(2, '0')} / ${Math.floor(totalIst)}:${String(Math.round((totalIst % 1) * 60)).padStart(2, '0')}`;
+  // Gesamtzeiten unter den Spalten hinzufügen
+  csv += `\n;_;_;_;_;_;${Math.floor(totalSoll)}:${String(Math.round((totalSoll % 1) * 60)).padStart(2, '0')};${Math.floor(totalIst)}:${String(Math.round((totalIst % 1) * 60)).padStart(2, '0')};_`;
 
   const oh = Math.floor(Math.abs(totalOvertimeMinutes) / 60);
   const om = Math.abs(totalOvertimeMinutes) % 60;
@@ -828,9 +828,15 @@ function exportPDF() {
       return `${hours}:${mins.toString().padStart(2, '0')}`;
     };
 
-    // Gesamtzeiten als einfache Zeile hinzufügen (gleiche Schriftgröße wie Tabelle)
+    // Gesamtzeiten unter den Spalten hinzufügen (gleiche Schriftgröße wie Tabelle)
     doc.setFontSize(8);
-    doc.text(`Gesamt: ${formatTime(totalSoll * 60)} / ${formatTime(totalIst * 60)}`, 14, doc.lastAutoTable.finalY + 10);
+    doc.autoTable({
+      head: [["", "", "", "", "", `${Math.floor(totalSoll)}:${String(Math.round((totalSoll % 1) * 60)).padStart(2, '0')}`, `${Math.floor(totalIst)}:${String(Math.round((totalIst % 1) * 60)).padStart(2, '0')}`, ""]],
+      startY: doc.lastAutoTable.finalY + 5,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [255, 255, 255] }
+    });
     doc.setFontSize(16); // danach wieder zurücksetzen für Überschriften
 
     // Überstunden berechnen
