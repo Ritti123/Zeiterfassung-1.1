@@ -694,23 +694,10 @@ function exportCSV() {
 
   if (entries.length === 0) return alert('Keine Daten vorhanden.');
 
-  let csv = `Monatsreport ${monthNames[parseInt(month)-1]} ${year}\nDatum;Kommen;Gehen;Pause;Art;Stunden;Sollstunden;Differenz\n`;
-  entries.forEach(e => {
-    const sollHours = e.sollHours ? e.sollHours : parseFloat(localStorage.getItem('workHours') || 8);
-    let diff = '';
-
-    if (e.type === 'Arbeit') {
-      const [h, m] = (e.hours || '0:00').split(":").map(Number);
-      const istMin = h * 60 + m;
-      const sollMin = sollHours * 60;
-      const diffMin = istMin - sollMin;
-      const sign = diffMin < 0 ? '-' : '';
-      diff = `${sign}${Math.floor(Math.abs(diffMin) / 60)}:${String(Math.abs(diffMin) % 60).padStart(2, '0')}`;
-    }
-
-    // Gesamtzeiten aus der Tabelle berechnen
+  // Gesamtzeiten berechnen
   let totalSoll = 0;
   let totalIst = 0;
+  let totalOvertimeMinutes = 0;
   entries.forEach(e => {
     if (e.type === 'Arbeit') {
       const sollHours = e.sollHours ? e.sollHours : parseFloat(localStorage.getItem('workHours') || 8);
@@ -722,9 +709,12 @@ function exportCSV() {
     }
   });
 
-  // Einträge in CSV-Format
+  // CSV-Header
+  let csv = `Monatsreport ${monthNames[parseInt(month)-1]} ${year}\nDatum;Kommen;Gehen;Pause;Art;Stunden;Sollstunden;Differenz\n`;
+
+  // Einträge hinzufügen
   entries.forEach(e => {
-    const sollHours = e.sollHours ? e.sollHours : parseFloat(localStorage.getItem('workHours') || 8);
+    const sollHours = e.type === 'Arbeit' ? (e.sollHours ? e.sollHours : parseFloat(localStorage.getItem('workHours') || 8)) : '';
     let diff = '';
 
     if (e.type === 'Arbeit') {
@@ -736,22 +726,22 @@ function exportCSV() {
       diff = `${sign}${Math.floor(Math.abs(diffMin) / 60)}:${String(Math.abs(diffMin) % 60).padStart(2, '0')}`;
     }
 
-    csv += `${formatDate(e.date)};${e.type === 'Arbeit' ? e.start || '' : ''};${e.type === 'Arbeit' ? e.end || '' : ''};${e.type === 'Arbeit' ? e.pause : ''};${e.type};${e.hours || '0:00'};${e.type === 'Arbeit' ? sollHours : ''};${diff}\n`;
+    csv += `${formatDate(e.date)};${e.type === 'Arbeit' ? e.start || '' : ''};${e.type === 'Arbeit' ? e.end || '' : ''};${e.type === 'Arbeit' ? e.pause : ''};${e.type};${e.hours || '0:00'};${sollHours};${diff}\n`;
   });
 
   // Gesamtzeiten unter den Spalten hinzufügen
   csv += `\n;_;_;_;_;_;${Math.floor(totalSoll)}:${String(Math.round((totalSoll % 1) * 60)).padStart(2, '0')};${Math.floor(totalIst)}:${String(Math.round((totalIst % 1) * 60)).padStart(2, '0')};_`;
   
-  // Überstunden berechnen
-  const oh = Math.floor(Math.abs(totalOvertimeMinutes) / 60);
-  const om = Math.abs(totalOvertimeMinutes) % 60;
-  const sign = totalOvertimeMinutes < 0 ? "-" : "";
-  const overtime = `${sign}${Math.floor(Math.abs(totalOvertimeMinutes) / 60)}:${String(om).padStart(2, '0')}`;
+  // Zusatzinformationen
   const vacationDays = parseInt(localStorage.getItem('vacationDays') || 24);
   const carryoverDays = parseInt(localStorage.getItem('carryoverDays') || 0);
   const vacationTotal = vacationDays + carryoverDays;
-  const vacationTaken = timeEntries.filter(e => e.type === 'Urlaub').length;
-  const sickDays = timeEntries.filter(e => e.type === 'Krank').length;
+  const vacationTaken = entries.filter(e => e.type === 'Urlaub').length;
+  const sickDays = entries.filter(e => e.type === 'Krank').length;
+
+  // Überstunden berechnen
+  const overtimeMinutes = (totalIst - totalSoll) * 60;
+  const overtime = `${Math.floor(Math.abs(overtimeMinutes) / 60)}:${String(Math.abs(overtimeMinutes) % 60).padStart(2, '0')}`;
 
   csv += `\nÜberstunden:;${overtime}\nUrlaub:;${vacationTaken} Tage (verfügbar: ${vacationTotal}, Resturlaub: ${carryoverDays})\nKrankheitstage:;${sickDays}`;
 
