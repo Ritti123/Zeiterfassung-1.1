@@ -736,8 +736,8 @@ function exportCSV() {
 
   csv += `\nÜberstunden:;${overtime}\nUrlaub:;${vacationTaken} Tage (verfügbar: ${vacationTotal}, Resturlaub: ${carryoverDays})\nKrankheitstage:;${sickDays}\n`;
 
-  // Gesamtzeiten hinzufügen
-  csv += `\nGesamtzeiten:\nSollzeit:;${Math.floor(totalSoll)}:${String(Math.round((totalSoll % 1) * 60)).padStart(2, '0')}\nIstzeit:;${Math.floor(totalIst)}:${String(Math.round((totalIst % 1) * 60)).padStart(2, '0')}\nDifferenz:;${Math.floor(totalIst - totalSoll)}:${String(Math.round(((totalIst - totalSoll) % 1) * 60)).padStart(2, '0')}\n`;
+  // Gesamtzeiten als einfache Zeile hinzufügen
+  csv += `\nGesamt: ${Math.floor(totalSoll)}:${String(Math.round((totalSoll % 1) * 60)).padStart(2, '0')} / ${Math.floor(totalIst)}:${String(Math.round((totalIst % 1) * 60)).padStart(2, '0')}`;
 
   download(`Monatsreport_${monthNames[parseInt(month)-1]}_${year}.csv`, csv, 'text/csv');
 }
@@ -819,17 +819,14 @@ function exportPDF() {
       headStyles: { fillColor: [192, 192, 192] }
     });
 
-    // Gesamtzeiten anzeigen
+    // Gesamtzeiten als einfache Zeile hinzufügen
     const formatTime = (minutes) => {
       const hours = Math.floor(minutes / 60);
       const mins = minutes % 60;
       return `${hours}:${mins.toString().padStart(2, '0')}`;
     };
 
-    doc.text('Gesamtzeiten:', 14, doc.lastAutoTable.finalY + 10);
-    doc.text(`Gesamt Sollzeit: ${formatTime(totalSoll * 60)}`, 14, doc.lastAutoTable.finalY + 20);
-    doc.text(`Gesamt Istzeit: ${formatTime(totalIst * 60)}`, 14, doc.lastAutoTable.finalY + 30);
-    doc.text(`Differenz: ${formatTime((totalIst - totalSoll) * 60)}`, 14, doc.lastAutoTable.finalY + 40);
+    doc.text(`Gesamt: ${formatTime(totalSoll * 60)} / ${formatTime(totalIst * 60)}`, 14, doc.lastAutoTable.finalY + 10);
 
     // Überstunden berechnen
     let overtime = 0;
@@ -851,9 +848,9 @@ function exportPDF() {
     const sickDays = timeEntries.filter(e => e.type === 'Krank').length;
     const carryoverDays = vacationTotal - vacationTaken;
 
-    doc.text(`Überstunden: ${sign}${oh}:${String(om).padStart(2, '0')}`, 14, doc.lastAutoTable.finalY + 50);
-    doc.text(`Urlaub: ${vacationTaken} Tage (verfügbar: ${vacationTotal}, Resturlaub: ${carryoverDays})`, 14, doc.lastAutoTable.finalY + 60);
-    doc.text(`Krankheitstage: ${sickDays}`, 14, doc.lastAutoTable.finalY + 70);
+    doc.text(`Überstunden: ${sign}${oh}:${String(om).padStart(2, '0')}`, 14, doc.lastAutoTable.finalY + 20);
+    doc.text(`Urlaub: ${vacationTaken} Tage (verfügbar: ${vacationTotal}, Resturlaub: ${carryoverDays})`, 14, doc.lastAutoTable.finalY + 30);
+    doc.text(`Krankheitstage: ${sickDays}`, 14, doc.lastAutoTable.finalY + 40);
 
     // PDF speichern
     doc.save(`Monatsreport_${monthNames[parseInt(month)-1]}_${year}.pdf`);
