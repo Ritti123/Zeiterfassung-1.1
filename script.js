@@ -708,12 +708,13 @@ function exportCSV() {
       diff = `${sign}${Math.floor(Math.abs(diffMin) / 60)}:${String(Math.abs(diffMin) % 60).padStart(2, '0')}`;
     }
 
-    // Gesamtzeiten berechnen
+    // Gesamtzeiten aus der Tabelle berechnen
   let totalSoll = 0;
   let totalIst = 0;
   entries.forEach(e => {
     if (e.type === 'Arbeit') {
-      totalSoll += parseFloat(e.sollHours || localStorage.getItem('workHours') || 8);
+      const sollHours = e.sollHours ? e.sollHours : parseFloat(localStorage.getItem('workHours') || 8);
+      totalSoll += sollHours;
       if (e.hours) {
         const [hours, minutes] = e.hours.split(':').map(Number);
         totalIst += hours + minutes/60;
@@ -723,6 +724,9 @@ function exportCSV() {
 
   csv += `${formatDate(e.date)};${e.type === 'Arbeit' ? e.start || '' : ''};${e.type === 'Arbeit' ? e.end || '' : ''};${e.type === 'Arbeit' ? e.pause : ''};${e.type};${e.hours || '0:00'};${e.type === 'Arbeit' ? sollHours : ''};${diff}\n`;
   });
+
+  // Gesamtzeiten als einfache Zeile hinzufügen
+  csv += `\nGesamt: ${Math.floor(totalSoll)}:${String(Math.round((totalSoll % 1) * 60)).padStart(2, '0')} / ${Math.floor(totalIst)}:${String(Math.round((totalIst % 1) * 60)).padStart(2, '0')}`;
 
   const oh = Math.floor(Math.abs(totalOvertimeMinutes) / 60);
   const om = Math.abs(totalOvertimeMinutes) % 60;
@@ -734,10 +738,7 @@ function exportCSV() {
   const vacationTaken = timeEntries.filter(e => e.type === 'Urlaub').length;
   const sickDays = timeEntries.filter(e => e.type === 'Krank').length;
 
-  csv += `\nÜberstunden:;${overtime}\nUrlaub:;${vacationTaken} Tage (verfügbar: ${vacationTotal}, Resturlaub: ${carryoverDays})\nKrankheitstage:;${sickDays}\n`;
-
-  // Gesamtzeiten als einfache Zeile hinzufügen
-  csv += `\nGesamt: ${Math.floor(totalSoll)}:${String(Math.round((totalSoll % 1) * 60)).padStart(2, '0')} / ${Math.floor(totalIst)}:${String(Math.round((totalIst % 1) * 60)).padStart(2, '0')}`;
+  csv += `\nÜberstunden:;${overtime}\nUrlaub:;${vacationTaken} Tage (verfügbar: ${vacationTotal}, Resturlaub: ${carryoverDays})\nKrankheitstage:;${sickDays}`;
 
   download(`Monatsreport_${monthNames[parseInt(month)-1]}_${year}.csv`, csv, 'text/csv');
 }
@@ -770,12 +771,13 @@ function exportPDF() {
     const headers = ["Datum", "Kommen", "Gehen", "Pause", "Art", "Stunden", "Sollstunden", "Differenz"];
     let data = [];
 
-    // Gesamtzeiten berechnen
+    // Gesamtzeiten aus der Tabelle berechnen
     let totalSoll = 0;
     let totalIst = 0;
     entries.forEach(e => {
       if (e.type === 'Arbeit') {
-        totalSoll += parseFloat(e.sollHours || localStorage.getItem('workHours') || 8);
+        const sollHours = e.sollHours ? e.sollHours : parseFloat(localStorage.getItem('workHours') || 8);
+        totalSoll += sollHours;
         if (e.hours) {
           const [hours, minutes] = e.hours.split(':').map(Number);
           totalIst += hours + minutes/60;
@@ -826,7 +828,10 @@ function exportPDF() {
       return `${hours}:${mins.toString().padStart(2, '0')}`;
     };
 
+    // Gesamtzeiten als einfache Zeile hinzufügen (gleiche Schriftgröße wie Tabelle)
+    doc.setFontSize(8);
     doc.text(`Gesamt: ${formatTime(totalSoll * 60)} / ${formatTime(totalIst * 60)}`, 14, doc.lastAutoTable.finalY + 10);
+    doc.setFontSize(16); // danach wieder zurücksetzen für Überschriften
 
     // Überstunden berechnen
     let overtime = 0;
