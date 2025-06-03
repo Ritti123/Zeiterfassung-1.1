@@ -741,7 +741,8 @@ function exportCSV() {
 
   // Gesamtzeiten unter den Spalten hinzufügen
   csv += `\n;_;_;_;_;_;${Math.floor(totalSoll)}:${String(Math.round((totalSoll % 1) * 60)).padStart(2, '0')};${Math.floor(totalIst)}:${String(Math.round((totalIst % 1) * 60)).padStart(2, '0')};_`;
-
+  
+  // Überstunden berechnen
   const oh = Math.floor(Math.abs(totalOvertimeMinutes) / 60);
   const om = Math.abs(totalOvertimeMinutes) % 60;
   const sign = totalOvertimeMinutes < 0 ? "-" : "";
@@ -751,6 +752,10 @@ function exportCSV() {
   const vacationTotal = vacationDays + carryoverDays;
   const vacationTaken = timeEntries.filter(e => e.type === 'Urlaub').length;
   const sickDays = timeEntries.filter(e => e.type === 'Krank').length;
+
+  csv += `\nÜberstunden:;${overtime}\nUrlaub:;${vacationTaken} Tage (verfügbar: ${vacationTotal}, Resturlaub: ${carryoverDays})\nKrankheitstage:;${sickDays}`;
+  
+  download(`Monatsreport_${monthNames[parseInt(month)-1]}_${year}.csv`, csv, 'text/csv');
 
   csv += `\nÜberstunden:;${overtime}\nUrlaub:;${vacationTaken} Tage (verfügbar: ${vacationTotal}, Resturlaub: ${carryoverDays})\nKrankheitstage:;${sickDays}`;
 
