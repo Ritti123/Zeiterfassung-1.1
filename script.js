@@ -708,7 +708,20 @@ function exportCSV() {
       diff = `${sign}${Math.floor(Math.abs(diffMin) / 60)}:${String(Math.abs(diffMin) % 60).padStart(2, '0')}`;
     }
 
-    csv += `${formatDate(e.date)};${e.type === 'Arbeit' ? e.start || '' : ''};${e.type === 'Arbeit' ? e.end || '' : ''};${e.type === 'Arbeit' ? e.pause : ''};${e.type};${e.hours || '0:00'};${e.type === 'Arbeit' ? sollHours : ''};${diff}\n`;
+    // Gesamtzeiten berechnen
+  let totalSoll = 0;
+  let totalIst = 0;
+  entries.forEach(e => {
+    if (e.type === 'Arbeit') {
+      totalSoll += parseFloat(e.sollHours || localStorage.getItem('workHours') || 8);
+      if (e.hours) {
+        const [hours, minutes] = e.hours.split(':').map(Number);
+        totalIst += hours + minutes/60;
+      }
+    }
+  });
+
+  csv += `${formatDate(e.date)};${e.type === 'Arbeit' ? e.start || '' : ''};${e.type === 'Arbeit' ? e.end || '' : ''};${e.type === 'Arbeit' ? e.pause : ''};${e.type};${e.hours || '0:00'};${e.type === 'Arbeit' ? sollHours : ''};${diff}\n`;
   });
 
   const oh = Math.floor(Math.abs(totalOvertimeMinutes) / 60);
@@ -722,6 +735,9 @@ function exportCSV() {
   const sickDays = timeEntries.filter(e => e.type === 'Krank').length;
 
   csv += `\nÜberstunden:;${overtime}\nUrlaub:;${vacationTaken} Tage (verfügbar: ${vacationTotal}, Resturlaub: ${carryoverDays})\nKrankheitstage:;${sickDays}\n`;
+
+  // Gesamtzeiten hinzufügen
+  csv += `\nGesamtzeiten:\nSollzeit:;${Math.floor(totalSoll)}:${String(Math.round((totalSoll % 1) * 60)).padStart(2, '0')}\nIstzeit:;${Math.floor(totalIst)}:${String(Math.round((totalIst % 1) * 60)).padStart(2, '0')}\nDifferenz:;${Math.floor(totalIst - totalSoll)}:${String(Math.round(((totalIst - totalSoll) % 1) * 60)).padStart(2, '0')}\n`;
 
   download(`Monatsreport_${monthNames[parseInt(month)-1]}_${year}.csv`, csv, 'text/csv');
 }
