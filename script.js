@@ -344,11 +344,10 @@ function renderEntries() {
       const [h, m] = (entry.hours || '0:00').split(":").map(Number);
       istMin = h * 60 + m;
       const sollMin = entry.sollHours ? entry.sollHours * 60 : parseFloat(localStorage.getItem('workHours') || 8) * 60;
-      monthlyOvertimeMinutes += istMin - sollMin;
-    } else if (entry.type === 'Überstunden') {
-      const [h, m] = (entry.hours || '0:00').split(":").map(Number);
-      istMin = h * 60 + m;
-      monthlyOvertimeMinutes += istMin;
+      const diffMin = istMin - sollMin;
+      if (diffMin > 0) {
+        monthlyOvertimeMinutes += diffMin;
+      }
     } else if (entry.type === 'Überstundenfrei') {
       const [h, m] = (entry.hours || '0:00').split(":").map(Number);
       istMin = h * 60 + m;
@@ -389,7 +388,10 @@ function renderEntries() {
       const [h, m] = (entry.hours || '0:00').split(":").map(Number);
       const istMin = h * 60 + m;
       const sollMin = entry.sollHours ? entry.sollHours * 60 : parseFloat(localStorage.getItem('workHours') || 8) * 60;
-      totalOvertimeMinutes += istMin - sollMin;
+      const diffMin = istMin - sollMin;
+      if (diffMin > 0) {
+        totalOvertimeMinutes += diffMin;
+      }
     } else if (entry.type === 'Überstundenfrei') {
       const [h, m] = (entry.hours || '0:00').split(":").map(Number);
       const istMin = h * 60 + m;
@@ -714,6 +716,7 @@ function exportCSV() {
   // Gesamtstunden berechnen
   let totalIstMin = 0;
   let totalSollMin = 0;
+  let totalOvertimeMin = 0;
   entries.forEach(e => {
     // Sollstunden
     const sollHours = parseFloat(localStorage.getItem('workHours') || 8);
@@ -734,6 +737,9 @@ function exportCSV() {
       diff = `${sign}${Math.floor(Math.abs(diffMin) / 60)}:${String(Math.abs(diffMin) % 60).padStart(2, '0')}`;
       totalIstMin += istMin;
       totalSollMin += sollMin;
+      if (diffMin > 0) {
+        totalOvertimeMin += diffMin;
+      }
     } else if (e.type !== 'Überstunden') {
       diff = '0:00';
       totalIstMin += workHours * 60;
@@ -752,7 +758,10 @@ function exportCSV() {
   const totalDiffHours = Math.floor(Math.abs(totalDiffMin) / 60);
   const totalDiffMinutes = Math.abs(totalDiffMin) % 60;
   const sign = totalDiffMin < 0 ? '-' : '';
+  const totalOvertimeHours = Math.floor(totalOvertimeMin / 60);
+  const totalOvertimeMinutes = totalOvertimeMin % 60;
   csv += `\nGesamtstunden;_;_;_;_;${totalIstHours}:${totalIstMinutes.padStart(2, '0')};${totalSollHours}:${totalSollMinutes.padStart(2, '0')};${sign}${totalDiffHours}:${totalDiffMinutes.padStart(2, '0')}`;
+  csv += `\nÜberstunden;_;_;_;_;_;_;${totalOvertimeHours}:${totalOvertimeMinutes.padStart(2, '0')}`;
 
   // Gesamtzeiten unter den Spalten hinzufügen
   csv += `\n;_;_;_;_;_;${Math.floor(totalSoll)}:${String(Math.round((totalSoll % 1) * 60)).padStart(2, '0')};${Math.floor(totalIst)}:${String(Math.round((totalIst % 1) * 60)).padStart(2, '0')};_`;
